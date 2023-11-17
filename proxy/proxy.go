@@ -109,7 +109,6 @@ func copy(ctx context.Context, dst io.Writer, src io.Reader, logSizer LogSizer) 
 		}
 
 		if size == 0 || ctx.Err() != nil {
-			fmt.Printf("size: %v\n", size)
 			continue
 		}
 
