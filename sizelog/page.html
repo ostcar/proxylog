@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+	<html lang="en">
+		<head>
+			<meta charset="utf-8"/>
+			<title>Proxy Log</title>
+			<link rel="icon" href="data:,"/>
+			<script>
+			window.onload = function () {	
+                var dps = [];
+                var chart = new CanvasJS.Chart("chartContainer", {
+                    exportEnabled: true,
+                    title :{
+                        text: "Sizes"
+                    },
+                    data: [{
+                        type: "spline",
+                        markerSize: 0,
+                        dataPoints: dps 
+                    }]
+                });
+                
+                var xVal = 0;
+                var yVal = 100;
+                var updateInterval = 1000;
+                var dataLength = 50; // number of dataPoints visible at any point
+
+                const evtSource = new EventSource("/data");
+
+                evtSource.onmessage = (event) => {
+                    dps.push({
+                        x: new Date(),
+                        y: parseInt(event.data),
+                    })
+                    xVal++;
+
+                    if (dps.length > dataLength) {
+                        dps.shift();
+                    }
+                    chart.render();  
+                };			
+			}
+			</script>
+		</head>
+		<body>
+
+			<div id="chartContainer" style="height: 370px; width:100%;"></div>
+			<script src="https://cdn.canvasjs.com/canvasjs.min.js"></script> 
+		</body>
+	</html>	

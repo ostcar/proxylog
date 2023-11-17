@@ -15,14 +15,6 @@ type LogSizer interface {
 	LogSize(size int)
 }
 
-// LogSizeFunc impelements the LogSizer interface with a function.
-type LogSizeFunc func(size int)
-
-// LogSize cols LogSize.
-func (ls LogSizeFunc) LogSize(size int) {
-	ls(size)
-}
-
 // Start starts the proxy. Runs until an error happens or the context if done.
 func Start(ctx context.Context, listenAddr string, incomming, outgoing LogSizer) error {
 	listener, err := new(net.ListenConfig).Listen(ctx, "tcp", listenAddr)
@@ -59,7 +51,6 @@ func handleConn(ctx context.Context, conn net.Conn, outgoing, incomming LogSizer
 		return fmt.Errorf("connect to server: %w", err)
 	}
 	defer remote.Close()
-	fmt.Printf("success connect to %s\n", addr)
 
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {

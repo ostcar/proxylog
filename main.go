@@ -7,9 +7,14 @@ import (
 	"os/signal"
 
 	"github.com/ostcar/proxylog/proxy"
+	"github.com/ostcar/proxylog/sizelog"
+	"golang.org/x/sync/errgroup"
 )
 
-const listenAddr = ":4567"
+const (
+	listenAddr    = ":4567"
+	webserverAddr = ":9050"
+)
 
 func main() {
 	ctx, cancel := interruptContext()
@@ -24,7 +29,19 @@ func main() {
 func run(ctx context.Context) error {
 	fmt.Printf("Listen socks4 proxy on  %s\n", listenAddr)
 
-	return proxy.Start(ctx, listenAddr, proxy.LogSizeFunc(func(size int) { fmt.Println(size) }), nil)
+	sl := new(sizelog.SizeLog)
+
+	eg, ctx := errgroup.WithContext(ctx)
+
+	eg.Go(func() error {
+		return sl.Run(ctx, webserverAddr)
+	})
+
+	eg.Go(func() error {
+		return proxy.Start(ctx, listenAddr, sl, nil)
+	})
+
+	return eg.Wait()
 }
 
 // interruptContext works like signal.NotifyContext
