@@ -3,10 +3,8 @@ package main
 import (
 	"context"
 	"fmt"
-	"net/url"
 	"os"
 	"os/signal"
-	"strings"
 
 	"github.com/ostcar/proxylog/proxy"
 )
@@ -17,39 +15,16 @@ func main() {
 	ctx, cancel := interruptContext()
 	defer cancel()
 
-	if err := run(ctx, os.Args); err != nil {
+	if err := run(ctx); err != nil {
 		fmt.Printf("Error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func run(ctx context.Context, args []string) error {
-	if len(os.Args) < 2 {
-		return fmt.Errorf("Usage: %s SERVER_ADDR", os.Args[0])
-	}
+func run(ctx context.Context) error {
+	fmt.Printf("Listen socks4 proxy on  %s\n", listenAddr)
 
-	url, err := url.Parse(args[1])
-	if err != nil {
-		return fmt.Errorf("invalid serer addr: %w", err)
-	}
-
-	browserAddr := listenAddr
-	if strings.HasPrefix(listenAddr, ":") {
-		browserAddr = "localhost" + listenAddr
-	}
-
-	fmt.Printf("Start browser and call %s://%s\n", url.Scheme, browserAddr)
-
-	host := url.Hostname() + ":" + url.Port()
-	if url.Port() == "" {
-		port := "80"
-		if url.Scheme == "https" {
-			port = "443"
-		}
-		host += port
-	}
-
-	return proxy.Start(ctx, host, listenAddr, proxy.LogSizeFunc(func(size int) { fmt.Println(size) }), nil)
+	return proxy.Start(ctx, listenAddr, proxy.LogSizeFunc(func(size int) { fmt.Println(size) }), nil)
 }
 
 // interruptContext works like signal.NotifyContext

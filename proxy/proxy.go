@@ -24,7 +24,7 @@ func (ls LogSizeFunc) LogSize(size int) {
 }
 
 // Start starts the proxy. Runs until an error happens or the context if done.
-func Start(ctx context.Context, toAddr, listenAddr string, incomming, outgoing LogSizer) error {
+func Start(ctx context.Context, listenAddr string, incomming, outgoing LogSizer) error {
 	listener, err := new(net.ListenConfig).Listen(ctx, "tcp", listenAddr)
 	if err != nil {
 		return fmt.Errorf("start listening on %s: %w", listenAddr, err)
@@ -37,7 +37,7 @@ func Start(ctx context.Context, toAddr, listenAddr string, incomming, outgoing L
 		}
 
 		go func() {
-			if err := handleConn(ctx, conn, toAddr, outgoing, incomming); err != nil {
+			if err := handleConn(ctx, conn, outgoing, incomming); err != nil {
 				// TODO: Maybe use an error handler.
 				log.Printf("Connection Error: %v", err)
 			}
@@ -46,14 +46,20 @@ func Start(ctx context.Context, toAddr, listenAddr string, incomming, outgoing L
 	}
 }
 
-func handleConn(ctx context.Context, conn net.Conn, toAddr string, outgoing, incomming LogSizer) error {
+func handleConn(ctx context.Context, conn net.Conn, outgoing, incomming LogSizer) error {
 	defer conn.Close()
 
-	remote, err := net.Dial("tcp", toAddr)
+	addr, err := socks4connect(conn)
+	if err != nil {
+		return fmt.Errorf("read socks4 header: %w", err)
+	}
+
+	remote, err := net.Dial("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("connect to server: %w", err)
 	}
 	defer remote.Close()
+	fmt.Printf("success connect to %s\n", addr)
 
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
@@ -65,6 +71,28 @@ func handleConn(ctx context.Context, conn net.Conn, toAddr string, outgoing, inc
 	})
 
 	return eg.Wait()
+}
+
+func socks4connect(rw io.ReadWriter) (string, error) {
+	buf := make([]byte, 9)
+	if _, err := io.ReadAtLeast(rw, buf, 9); err != nil {
+		return "", fmt.Errorf("read : %w", err)
+	}
+
+	if buf[0] != 4 || buf[1] != 1 {
+		return "", fmt.Errorf("expecting a socks4 new tcp packe")
+	}
+
+	port := int(buf[2])*256 + int(buf[3])
+
+	ip := net.IP(buf[4:8])
+	addr := fmt.Sprintf("%s:%d", ip, port)
+
+	if _, err := rw.Write([]byte{0, 0x5A, 0, 0, 0, 0, 0, 0}); err != nil {
+		return "", fmt.Errorf("writing socks4 header: %w", err)
+	}
+
+	return addr, nil
 }
 
 func copy(ctx context.Context, dst io.Writer, src io.Reader, logSizer LogSizer) error {
@@ -91,7 +119,7 @@ func copy(ctx context.Context, dst io.Writer, src io.Reader, logSizer LogSizer) 
 		}
 
 		if logSizer != nil {
-			logSizer.LogSize(nw)
+			logSizer.LogSize(size)
 		}
 
 		if size != nw {
