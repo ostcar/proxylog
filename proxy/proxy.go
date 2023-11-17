@@ -17,6 +17,7 @@ type LogSizer interface {
 
 // Start starts the proxy. Runs until an error happens or the context if done.
 func Start(ctx context.Context, listenAddr string, incomming, outgoing LogSizer) error {
+	fmt.Printf("Listen socks4 proxy on  %s\n", listenAddr)
 	listener, err := new(net.ListenConfig).Listen(ctx, "tcp", listenAddr)
 	if err != nil {
 		return fmt.Errorf("start listening on %s: %w", listenAddr, err)

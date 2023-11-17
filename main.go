@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/signal"
 
@@ -27,11 +28,23 @@ func main() {
 }
 
 func run(ctx context.Context) error {
-	fmt.Printf("Listen socks4 proxy on  %s\n", listenAddr)
-
 	sl := new(sizelog.SizeLog)
-
 	eg, ctx := errgroup.WithContext(ctx)
+
+	var file io.Writer
+	if len(os.Args) >= 2 {
+		f, err := os.OpenFile(os.Args[1], os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0o600)
+		if err != nil {
+			return fmt.Errorf("open log file: %w", err)
+		}
+
+		file = f
+	}
+
+	eg.Go(func() error {
+		sl.Background(ctx, file)
+		return nil
+	})
 
 	eg.Go(func() error {
 		return sl.Run(ctx, webserverAddr)

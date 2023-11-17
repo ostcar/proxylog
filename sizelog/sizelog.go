@@ -4,6 +4,7 @@ import (
 	"context"
 	_ "embed" // For embedding
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"sync/atomic"
@@ -21,6 +22,37 @@ type SizeLog struct {
 // LogSize is called with a size.
 func (sl *SizeLog) LogSize(size int) {
 	sl.size.Add(uint64(size))
+}
+
+// Background runs in the background.
+func (sl *SizeLog) Background(ctx context.Context, w io.Writer) {
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			size := sl.size.Load()
+			if size == 0 {
+				continue
+			}
+
+			sl.size.Add(-size)
+			if w == nil {
+				continue
+			}
+
+			now := time.Now()
+			fmt.Fprintf(w,
+				"%s: %d\n",
+				now.UTC().Format("2006-01-02T15:04:05"),
+				size,
+			)
+
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // Run starts the log
@@ -72,12 +104,7 @@ func (sl *SizeLog) serveData(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case <-ticker.C:
-			size := sl.size.Load()
-			if size != 0 {
-				sl.size.Add(-size)
-			}
-
-			fmt.Fprintf(w, "data: %d\n\n", size)
+			fmt.Fprintf(w, "data: %d\n\n", sl.size.Load())
 			w.(http.Flusher).Flush()
 
 		case <-ctx.Done():
