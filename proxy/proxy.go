@@ -55,11 +55,19 @@ func handleConn(ctx context.Context, conn net.Conn, outgoing, incomming LogSizer
 
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
-		return copy(ctx, remote, conn, outgoing)
+		if err := copy(ctx, remote, conn, outgoing); err != nil {
+			return fmt.Errorf("copy from conn to remote: %w", err)
+		}
+
+		return nil
 	})
 
 	eg.Go(func() error {
-		return copy(ctx, conn, remote, incomming)
+		if err := copy(ctx, conn, remote, incomming); err != nil {
+			return fmt.Errorf("copy from remote to conn: %w", err)
+		}
+
+		return nil
 	})
 
 	return eg.Wait()
